@@ -1773,6 +1773,21 @@ var OPTIMISTIC_TESTS = [
 			errors: []
 		}
 	},
+	{
+		description: "Quoted field has invalid trailing quote inside valid quoted statement",
+		input: '"a"bc",d\ne,f',
+		notes: "The input is malformed, opening quotes identified, trailing quote is malformed. Trailing quote should be escaped or followed by valid new line or delimiter to be valid",
+		expected: {
+			data: [['a"bc', 'd'], ['e', 'f']],
+			errors: [{
+				"type": "Quotes",
+				"code": "InvalidQuotes",
+				"message": "Trailing quote on quoted field is malformed",
+				"row": 0,
+				"index":1
+			}]
+		}
+	},
 	//Opening quotes with delimiters and no closer
 	{
 		description: "Quoted field has no closing quote, line delimiters exist after quote",
