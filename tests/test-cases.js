@@ -1718,3 +1718,168 @@ describe('Custom Tests', function() {
 		generateTest(CUSTOM_TESTS[i]);
 	}
 });
+
+
+
+
+var OPTIMISTIC_TESTS = [
+	//Opening quotes without ends
+	{
+		description: "Quotes in the string of text - no other quotes in following text",
+		input: 'a,"b\nc,d',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a', '"b'],['c', 'd']],
+			errors: []
+		}
+	},
+	{
+		description: "Quotes in the string of text - multiple openers",
+		input: '"a,"b\n"c,"d',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['"a', '"b'],['"c', '"d']],
+			errors: []
+		}
+	},
+	//Quotes with valid trailing quotes
+	{
+		description: "Quotes in the string of text - valid closing identified later after new row",
+		input: 'a,"b,c\nd",e,f',
+		notes: "The input is technically malformed, and can be interpreted multiple ways. Because valid quote is detected (quote and new line), identify it all as quoted text",
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b,c\nd', 'e', 'f']],
+			errors: []
+		}
+	},
+	{
+		description: "Quotes in the string of text - valid closing is identified in later column",
+		input: 'a,"b,c"\nd,e,f',
+		notes: "The input is technically malformed, and can be interpreted multiple ways. Because valid quote is detected (quote and new line), identify it all as quoted text",
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a', 'b,c'],['d', 'e', 'f']],
+			errors: []
+		}
+	},
+	{
+		description: "Quotes in the string of text - valid closing is identified later",
+		input: 'a,"b,c""\nd",e,f',
+		notes: "The input is technically malformed, and can be interpreted multiple ways. Because valid quote is detected (2 quotes), identify it all as quoted text",
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b,c"\nd', 'e', 'f']],
+			errors: []
+		}
+	},
+	//Opening quotes with delimiters and no closer
+	{
+		description: "Quoted field has no closing quote, line delimiters exist after quote",
+		input: 'a,b,"c\nd,e,f',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b','"c'],['d', 'e', 'f']],
+			errors: []
+		}
+	},
+	{
+		description: "Quoted field has no closing quote, delimiters exist after quote",
+		input: 'a,b,c\n"d,e,f',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b','c'],['"d', 'e', 'f']],
+			errors: []
+		}
+	},
+	{
+		description: "Quotes in the string of text - potential closing found in new row",
+		input: 'a,b,"c\nd"e,f,g',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a', 'b', '"c'],['d"e', 'f', 'g']],
+			errors: []
+		}
+	},
+	//Quoted content in a field
+	{
+		description: "Quoted content exists",
+		input: 'a,b,"c"\nd,e,f',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b','c'],['d', 'e', 'f']],
+			errors: []
+		}
+	},
+	{
+		description: "Ending with quoted content",
+		input: 'a,b,c\nd,e,"f"',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b','c'],['d', 'e', 'f']],
+			errors: []
+		}
+	},
+	{
+		description: "Ending field contains quoted content",
+		input: 'a,b,c\nd,e,"f"g',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','b','c'],['d', 'e', '"f"g']],
+			errors: []
+		}
+	},
+	{
+		description: "Multiple rows of text with quotes in the string",
+		input: 'a,"b" c\nd,"e" f',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a', '"b" c'],['d', '"e" f']],
+			errors: []
+		}
+	},
+	{
+		description: "Quotes in the string of text - potential closing found in new column",
+		input: 'a,"b,c"d\ne,f,g',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a','"b','c"d'],['e', 'f', 'g']],
+			errors: []
+		}
+	},
+	//Quoted content with escaped quotes
+	{
+		description: "Line break integrated into following quotes",
+		input: 'a,b\n"""c""\nd",e',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a', 'b'],['"c"\nd', 'e']],
+			errors: []
+		}
+	},
+	{
+		description: "Quotes in the string, line break integrated into following quotes",
+		input: 'a,"b\n"""c""\nd",e',
+		config: { optimisticQuotes: true },
+		expected: {
+			data: [['a', '"b'],['"c"\nd', 'e']],
+			errors: []
+		}
+	}
+
+];
+
+describe('Optimistic Quotes - ', function() {
+	function generateTest(test) {
+		(test.disabled ? it.skip : it)(test.description, function() {
+			var actual = new Papa.Parser(test.config).parse(test.input);
+			assert.deepEqual(JSON.stringify(actual.errors), JSON.stringify(test.expected.errors));
+			assert.deepEqual(actual.data, test.expected.data);
+		});
+	}
+
+	for (var i = 0; i < OPTIMISTIC_TESTS.length; i++) {
+		generateTest(OPTIMISTIC_TESTS[i]);
+	}
+});
+

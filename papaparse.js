@@ -1153,6 +1153,7 @@
 		var preview = config.preview;
 		var fastMode = config.fastMode;
 		var quoteChar = config.quoteChar || '"';
+		var optimisticQuotes = config.optimisticQuotes || false;
 
 		// Delimiter must be valid
 		if (typeof delim !== 'string'
@@ -1253,17 +1254,60 @@
 						//No other quotes are found - no other delimiters
 						if (quoteSearch === -1)
 						{
-							if (!ignoreLastRow) {
-								// No closing quote... what a pity
-								errors.push({
-									type: 'Quotes',
-									code: 'MissingQuotes',
-									message: 'Quoted field unterminated',
-									row: data.length,	// row has yet to be inserted
-									index: cursor
-								});
+
+							if( optimisticQuotes ){
+
+								// Assume starting quotes are part of valid text string - split via delimiter if it exists
+								if (nextDelim !== -1 && (nextDelim < nextNewline || nextNewline === -1 ))
+								{
+									row.push(input.substring(cursor-1, nextDelim).replace(quoteCharRegex, quoteChar));
+									cursor = nextDelim + delimLen;
+									nextDelim = input.indexOf(delim, cursor);
+									nextNewline = input.indexOf(newline, cursor);
+									break;
+								}
+
+								// Assume starting quotes are part of valid text string - split via row if it exists
+								if (nextNewline !== -1 )
+								{
+									row.push(input.substring(cursor-1, nextNewline).replace(quoteCharRegex, quoteChar));
+									saveRow(nextNewline + newlineLen);
+									nextDelim = input.indexOf(delim, cursor);	// because we may have skipped the nextDelim in the quoted field
+
+									if (stepIsFunction)
+									{
+										doStep();
+										if (aborted)
+											return returnable();
+									}
+
+									if (preview && data.length >= preview)
+										return returnable(true);
+
+									break;
+								}
+
+								cursor --; //Step back to collect quote that was in string, another string was found
+								return finish();
+
 							}
-							return finish();
+							else
+							{
+								if (!ignoreLastRow)
+								{
+									// No closing quote... what a pity
+									errors.push({
+										type: 'Quotes',
+										code: 'MissingQuotes',
+										message: 'Quoted field unterminated',
+										row: data.length,	// row has yet to be inserted
+										index: cursor
+									});
+								}
+
+								return finish();
+							}
+
 						}
 
 						// Closing quote at EOF
@@ -1311,17 +1355,53 @@
 						}
 
 
-						// Checks for valid closing quotes are complete (escaped quotes or quote followed by EOF/delimiter/newline) -- assume these quotes are part of an invalid text string
-						errors.push({
-							type: 'Quotes',
-							code: 'InvalidQuotes',
-							message: 'Trailing quote on quoted field is malformed',
-							row: data.length,	// row has yet to be inserted
-							index: cursor
-						});
+						if (optimisticQuotes){
 
-						quoteSearch++;
-						continue;
+							// Checks for valid closing quotes are complete (escaped quotes or quote followed by EOF/delimiter/newline) -- assume quotes are part of valid text string - split via delimiter if it exists
+							if (nextDelim !== -1 && nextDelim < quoteSearch && (nextDelim < nextNewline || nextNewline === -1))
+							{
+								row.push(input.substring(cursor-1, nextDelim).replace(quoteCharRegex, quoteChar));
+								cursor = nextDelim + delimLen;
+								nextDelim = input.indexOf(delim, cursor);
+								nextNewline = input.indexOf(newline, cursor);
+								break;
+							}
+
+							// Checks for valid closing quotes are complete (escaped quotes or quote followed by EOF/delimiter/newline) -- assume quotes are part of valid text string - split via new line if it exists
+							if (nextNewline !== -1 && nextNewline < quoteSearch)
+							{
+								row.push(input.substring(cursor-1, nextNewline).replace(quoteCharRegex, quoteChar));
+								saveRow(nextNewline + newlineLen);
+								nextDelim = input.indexOf(delim, cursor);	// because we may have skipped the nextDelim in the quoted field
+
+								if (stepIsFunction)
+								{
+									doStep();
+									if (aborted)
+										return returnable();
+								}
+
+								if (preview && data.length >= preview)
+									return returnable(true);
+
+								break;
+							}
+
+						}else{
+
+							// Checks for valid closing quotes are complete (escaped quotes or quote followed by EOF/delimiter/newline) -- assume quotes are part of an invalid text string
+							errors.push({
+								type: 'Quotes',
+								code: 'InvalidQuotes',
+								message: 'Trailing quote on quoted field is malformed',
+								row: data.length,	// row has yet to be inserted
+								index: cursor
+							});
+
+							quoteSearch++;
+							continue;
+
+						}
 
 					}
 
