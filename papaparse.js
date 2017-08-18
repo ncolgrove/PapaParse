@@ -1153,7 +1153,7 @@
 		var preview = config.preview;
 		var fastMode = config.fastMode;
 		var quoteChar = config.quoteChar || '"';
-		var optimisticQuotes = config.optimisticQuotes || false;
+		var assumeUnquoted = config.assumeUnquoted || false;
 
 		// Delimiter must be valid
 		if (typeof delim !== 'string'
@@ -1242,6 +1242,7 @@
 				{
 					// Start our search for the closing quote where the cursor is
 					var quoteSearch = cursor;
+					var quoteBuffer = 0;
 
 					// Skip the opening quote
 					cursor++;
@@ -1255,7 +1256,7 @@
 						if (quoteSearch === -1)
 						{
 
-							if( optimisticQuotes ){
+							if( assumeUnquoted ){
 
 								// Assume starting quotes are part of valid text string - split via delimiter if it exists
 								if (nextDelim !== -1 && (nextDelim < nextNewline || nextNewline === -1 ))
@@ -1313,7 +1314,19 @@
 						// Closing quote at EOF
 						if (quoteSearch === inputLen-1)
 						{
-							var value = input.substring(cursor, quoteSearch).replace(quoteCharRegex, quoteChar);
+
+							if( assumeUnquoted )
+							{
+								var noDelim = (nextDelim===-1 || nextDelim>quoteSearch);            //Check for no previous delimiters
+								var noNewline = (nextNewline===-1 || nextNewline>quoteSearch);      //Check for no previous new line characters
+								var noQuote = input.indexOf(quoteChar, cursor+1) === quoteSearch;   //Check for no previous quotes
+
+								if (noDelim && noNewline && noQuote){
+									quoteBuffer = 1;
+								}
+							}
+
+							var value = input.substring(cursor - quoteBuffer, quoteSearch + quoteBuffer).replace(quoteCharRegex, quoteChar);
 							return finish(value);
 						}
 
@@ -1327,7 +1340,20 @@
 						// Closing quote followed by delimiter
 						if (input[quoteSearch+1] === delim)
 						{
-							row.push(input.substring(cursor, quoteSearch).replace(quoteCharRegex, quoteChar));
+
+							if( assumeUnquoted )
+							{
+								var noDelim = (nextDelim===-1 || nextDelim>quoteSearch);            //Check for no previous delimiters
+								var noNewline = (nextNewline===-1 || nextNewline>quoteSearch);      //Check for no previous new line characters
+								var noQuote = input.indexOf(quoteChar, cursor+1) === quoteSearch;   //Check for no previous quotes
+
+								if (noDelim && noNewline && noQuote){
+									quoteBuffer = 1;
+								}
+
+							}
+
+							row.push(input.substring(cursor - quoteBuffer, quoteSearch + quoteBuffer).replace(quoteCharRegex, quoteChar));
 							cursor = quoteSearch + 1 + delimLen;
 							nextDelim = input.indexOf(delim, cursor);
 							nextNewline = input.indexOf(newline, cursor);
@@ -1337,7 +1363,20 @@
 						// Closing quote followed by newline
 						if (input.substr(quoteSearch+1, newlineLen) === newline)
 						{
-							row.push(input.substring(cursor, quoteSearch).replace(quoteCharRegex, quoteChar));
+
+							if( assumeUnquoted )
+							{
+								var noDelim = (nextDelim===-1 || nextDelim>quoteSearch);            //Check for no previous delimiters
+								var noNewline = (nextNewline===-1 || nextNewline>quoteSearch);      //Check for no previous new line characters
+								var noQuote = input.indexOf(quoteChar, cursor+1) === quoteSearch;   //Check for no previous quotes
+
+								if (noDelim && noNewline && noQuote){
+									quoteBuffer = 1;
+								}
+
+							}
+
+							row.push(input.substring(cursor - quoteBuffer, quoteSearch + quoteBuffer).replace(quoteCharRegex, quoteChar));
 							saveRow(quoteSearch + 1 + newlineLen);
 							nextDelim = input.indexOf(delim, cursor);	// because we may have skipped the nextDelim in the quoted field
 
@@ -1355,7 +1394,7 @@
 						}
 
 
-						if (optimisticQuotes){
+						if (assumeUnquoted){
 
 							// Checks for valid closing quotes are complete (escaped quotes or quote followed by EOF/delimiter/newline) -- assume quotes are part of valid text string - split via delimiter if it exists
 							if (nextDelim !== -1 && nextDelim < quoteSearch && (nextDelim < nextNewline || nextNewline === -1))
